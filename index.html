@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高機能カスタムタイマー</title>
+    <style>
+        /* 配色管理用のCSS変数 */
+        :root {
+            --bg-color: #cbd5e1;         
+            --text-color: #0f172a;       
+            --button-bg: #3182ce;        
+            --button-text: #ffffff;      
+            --circle-color: #ffffff;     
+            --progress-bg: #ffffff;      
+            --progress-fill: #3182ce;    
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.4s ease, color 0.4s ease;
+            position: relative;
+        }
+
+        /* 画面共通スタイル */
+        .screen {
+            display: none;
+            width: 100%;
+            height: 100%;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 3vw;
+            z-index: 2;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        /* ボタン共通 */
+        button {
+            border-radius: 16px;
+            border: none;
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            opacity: 0.95;
+        }
+        button:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 4px 0 rgba(0,0,0,0.1);
+        }
+
+        /* ─── 設定画面 ─── */
+        #settings-screen {
+            font-size: 3.5vmin;
+            gap: 2.5vh;
+        }
+        .title-text {
+            font-size: 6vmin;
+            font-weight: bold;
+            letter-spacing: 0.05em;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .row {
+            display: flex;
+            gap: 2vw;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+
+        /* トグルスイッチ構造 */
+        .toggle-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5vh;
+        }
+        .toggle-label {
+            font-size: 3.5vmin;
+            font-weight: bold;
+        }
+        .toggle-switch {
+            display: flex;
+            border: 2px solid var(--text-color);
+            border-radius: 12px;
+            overflow: hidden;
+            width: 60vw;
+            max-width: 350px;
+            height: 8vh;
+            max-height: 60px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .toggle-btn {
+            flex: 1;
+            border-radius: 0;
+            font-size: 3.5vmin;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: transparent;
+            color: var(--text-color);
+            opacity: 0.6;
+            box-shadow: none;
+        }
+        .toggle-btn:hover {
+            transform: none;
+            box-shadow: none;
+        }
+        .toggle-btn.active {
+            background-color: var(--progress-fill);
+            color: var(--button-text);
+            opacity: 1;
+        }
+
+        .quick-buttons button {
+            padding: 1.5vh 2.5vw;
+            font-size: 2.8vmin;
+        }
+        .time-picker {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr auto 1fr;
+            gap: 1vh 1vw;
+            text-align: center;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.3);
+            padding: 2vh 3vw;
+            border-radius: 24px;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+        }
+        .arrow-btn {
+            font-size: 3vmin;
+            padding: 1.5vh 2vw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .time-input-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .time-input {
+            font-size: 9vmin;
+            width: 16vw;
+            max-width: 120px;
+            text-align: center;
+            background: rgba(255,255,255,0.5);
+            border: 3px solid var(--text-color);
+            color: var(--text-color);
+            border-radius: 12px;
+            font-weight: bold;
+            padding: 0.5vh 0;
+            transition: all 0.2s;
+        }
+        .time-input:focus {
+            outline: none;
+            background: rgba(255,255,255,0.9);
+            box-shadow: 0 0 0 4px var(--progress-fill);
+        }
+        .time-input::-webkit-inner-spin-button,
+        .time-input::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .time-input { -moz-appearance: textfield; }
+        
+        .picker-colon {
+            font-size: 8vmin;
+            font-weight: bold;
+            padding: 0 5px;
+            line-height: 1;
+        }
+
+        .start-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4vw;
+        }
+        #start-btn {
+            padding: 2vh 6vw;
+            font-size: 4.5vmin;
+        }
+        
+        .audio-ctrl-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5vh;
+        }
+        .audio-toggle-btn {
+            width: 8vh;
+            height: 8vh;
+            max-width: 60px;
+            max-height: 60px;
+            border-radius: 50%;
+            font-size: 4vmin;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            border: 3px solid var(--text-color);
+        }
+        .audio-toggle-btn.muted::after {
+            content: "";
+            position: absolute;
+            width: 80%;
+            height: 4px;
+            background-color: var(--text-color);
+            transform: rotate(45deg);
+        }
+        .audio-label {
+            font-size: 2.3vmin;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .repeat-toggle-switch {
+            display: flex;
+            border: 2px solid var(--text-color);
+            border-radius: 8px;
+            overflow: hidden;
+            width: 24vw;
+            max-width: 130px;
+            height: 4.5vh;
+            max-height: 35px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .repeat-toggle-btn {
+            flex: 1;
+            border-radius: 0;
+            font-size: 2.2vmin;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: transparent;
+            color: var(--text-color);
+            opacity: 0.6;
+            box-shadow: none;
+        }
+        .repeat-toggle-btn:hover {
+            transform: none;
+            box-shadow: none;
+        }
+        .repeat-toggle-btn.active {
+            background-color: var(--progress-fill);
+            color: var(--button-text);
+            opacity: 1;
+        }
+
+        /* ─── タイマー画面 ─── */
+        #timer-screen {
+            position: relative;
+            padding: 0;
+            display: none;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+        }
+        #timer-screen.active {
+            display: flex;
+        }
+        
+        .timer-bg-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, transparent 30%, rgba(255,255,255,0.15) 100%);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .top-controls {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            display: flex;
+            gap: 10px;
+            z-index: 20;
+        }
+        .top-controls button {
+            padding: 10px 16px;
+            font-size: 16px;
+            border-radius: 8px;
+            opacity: 0.9;
+        }
+        
+        .timer-main-layout {
+            flex: 1;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            z-index: 2;
+        }
+
+        .timer-container {
+            position: relative;
+            width: 100%;
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        
+        .timer-circle-svg {
+            width: 90vh;
+            height: 90vh;
+            max-width: 95vw;
+            max-height: 95vw;
+            transform: rotate(-90deg);
+            transition: width 0.2s, height 0.2s, max-width 0.2s, max-height 0.2s;
+            filter: drop-shadow(0 10px 25px rgba(0,0,0,0.08));
+        }
+        .timer-circle-svg.expanded {
+            width: 96vh;
+            height: 96vh;
+            max-width: 98vw;
+            max-height: 98vw;
+        }
+        
+        .circle-bg {
+            fill: var(--circle-color);
+        }
+        .circle-fill {
+            fill: none;
+            stroke: var(--progress-fill);
+            stroke-width: 100; 
+            stroke-dasharray: 314.159; 
+            stroke-dashoffset: 314.159;
+        }
+
+        .timer-text {
+            font-size: 24vmin; 
+            font-weight: 900;
+            font-family: "Arial", "Arial Black", sans-serif;
+            white-space: nowrap;
+            position: absolute;
+            z-index: 10;
+            text-align: center;
+            width: auto;
+            max-width: 95vw; 
+            overflow: hidden;
+            text-overflow: clip;
+            pointer-events: none;
+            transition: font-size 0.2s;
+            text-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        }
+        .timer-text.max-expanded {
+            font-size: 32vmin;
+            max-width: 98vw;
+        }
+        .timer-text.time-up {
+            color: #ff3b30 !important;
+        }
+        
+        .progress-bar-container {
+            width: calc(100% - 16px);
+            margin-left: 8px;
+            margin-right: 8px;
+            margin-bottom: 8px;
+            height: 65px;
+            background-color: var(--progress-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            flex-shrink: 0;
+            box-shadow: inset 0 4px 6px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: var(--progress-fill);
+            box-shadow: inset -4px 0 10px rgba(0,0,0,0.1);
+        }
+
+        /* ─── 配色設定画面 ─── */
+        #color-screen {
+            font-size: 3.5vmin;
+            gap: 2.5vh;
+            overflow-y: auto;
+            padding: 4vw;
+        }
+        #color-screen h2 {
+            font-size: 5vmin;
+            margin-bottom: 1vh;
+        }
+        .presets {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5vw;
+            width: 100%;
+            max-width: 700px;
+        }
+        .presets button {
+            padding: 1.8vh;
+            font-size: 2.8vmin;
+        }
+        .custom-colors {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5vh 3vw;
+            width: 100%;
+            max-width: 700px;
+            margin-top: 1vh;
+        }
+        @media (max-width: 600px) {
+            .custom-colors { grid-template-columns: 1fr; }
+        }
+        .color-picker-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(0,0,0,0.04);
+            padding: 1.2vh 3vw;
+            border-radius: 12px;
+            font-size: 2.8vmin;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .color-picker-wrapper input[type="color"] {
+            border: none;
+            width: 8vw;
+            height: 4vh;
+            min-width: 40px;
+            min-height: 30px;
+            cursor: pointer;
+            background: transparent;
+        }
+        .back-btn {
+            padding: 2vh 6vw;
+            font-size: 3.5vmin;
+            margin-top: 2vh;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="settings-screen" class="screen active">
+        <div class="title-text">タイマー</div>
+
+        <div class="toggle-container">
+            <div class="toggle-label">カウント</div>
+            <div class="toggle-switch">
+                <button id="toggle-up" class="toggle-btn active" onclick="setTimerMode('countup')">アップ</button>
+                <button id="toggle-down" class="toggle-btn" onclick="setTimerMode('countdown')">ダウン</button>
+            </div>
+        </div>
+        
+        <div class="quick-buttons row">
+            <button class="quick-add-btn" data-secs="10">+10秒</button>
+            <button class="quick-add-btn" data-secs="60">+1分</button>
+            <button class="quick-add-btn" data-secs="300">+5分</button>
+            <button class="quick-add-btn" data-secs="600">+10分</button>
+        </div>
+
+        <div class="time-picker">
+            <button class="arrow-btn" data-type="h" data-dir="1">▲</button>
+            <div></div>
+            <button class="arrow-btn" data-type="m" data-dir="1">▲</button>
+            <div></div>
+            <button class="arrow-btn" data-type="s" data-dir="1">▲</button>
+            
+            <div class="time-input-wrapper"><input type="number" id="input-h" class="time-input" value="0" min="0" max="99"></div>
+            <div class="picker-colon">:</div>
+            <div class="time-input-wrapper"><input type="number" id="input-m" class="time-input" value="0" min="0" max="59"></div>
+            <div class="picker-colon">:</div>
+            <div class="time-input-wrapper"><input type="number" id="input-s" class="time-input" value="0" min="0" max="59"></div>
+            
+            <button class="arrow-btn" data-type="h" data-dir="-1">▼</button>
+            <div></div>
+            <button class="arrow-btn" data-type="m" data-dir="-1">▼</button>
+            <div></div>
+            <button class="arrow-btn" data-type="s" data-dir="-1">▼</button>
+        </div>
+
+        <div class="row">
+            <button id="toggle-circle-btn" onclick="toggleVisibility('circle')" style="padding: 1vh 2vw; font-size: 2.5vmin;">円グラフ: 表示</button>
+            <button id="toggle-bar-btn" onclick="toggleVisibility('bar')" style="padding: 1vh 2vw; font-size: 2.5vmin;">帯: 表示</button>
+        </div>
+
+        <div class="start-row">
+            <button id="start-btn" onclick="startTimer()">スタート</button>
+            <div class="audio-ctrl-group">
+                <button id="audio-toggle" class="audio-toggle-btn" onclick="toggleAudio()">♪</button>
+                <div class="audio-label">通知音</div>
+                <div class="repeat-toggle-switch">
+                    <button id="repeat-on" class="repeat-toggle-btn active" onclick="setRepeatMode(true)">連打</button>
+                    <button id="repeat-off" class="repeat-toggle-btn" onclick="setRepeatMode(false)">1回</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="action-buttons row">
+            <button onclick="switchScreen('color-screen')" style="padding: 1.5vh 4vw; font-size: 3vmin;">配色設定</button>
+            <button onclick="resetSettings()" style="padding: 1.5vh 4vw; font-size: 3vmin;">リセット</button>
+        </div>
+    </div>
+
+    <div id="timer-screen" class="screen">
+        <div class="timer-bg-overlay"></div>
+        <div class="top-controls">
+            <button id="pause-resume-btn" onclick="togglePauseResume()">一時停止</button>
+            <button onclick="stopTimer()">停止</button>
+        </div>
+        
+        <div class="timer-main-layout">
+            <div class="timer-container" id="timer-container-area">
+                <svg id="timer-svg-container" class="timer-circle-svg" viewBox="0 0 200 200">
+                    <circle class="circle-bg" cx="100" cy="100" r="100"/>
+                    <circle id="progress-circle" class="circle-fill" cx="100" cy="100" r="50"/>
+                </svg>
+                <div id="timer-text" class="timer-text">00:00:00</div>
+            </div>
+            
+            <div id="progress-bar-container" class="progress-bar-container">
+                <div id="progress-bar" class="progress-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="color-screen" class="screen">
+        <h2>配色設定</h2>
+        <div class="presets">
+            <button onclick="applyPreset('light')">ライト</button>
+            <button onclick="applyPreset('dark')">ダーク</button>
+            <button onclick="applyPreset('sakura')">サクラ</button>
+            <button onclick="applyPreset('forest')">フォレスト</button>
+            <button onclick="applyPreset('midnight')">ミッドナイト</button>
+            <button onclick="applyPreset('sepia')">セピア</button>
+        </div>
+        <div class="custom-colors">
+            <div class="color-picker-wrapper"><span>背景色</span><input type="color" id="col-bg" onchange="updateCustomColor('--bg-color', this.value)"></div>
+            <div class="color-picker-wrapper"><span>文字色</span><input type="color" id="col-text" onchange="updateCustomColor('--text-color', this.value)"></div>
+            <div class="color-picker-wrapper"><span>ボタン背景</span><input type="color" id="col-btn-bg" onchange="updateCustomColor('--button-bg', this.value)"></div>
+            <div class="color-picker-wrapper"><span>ボタン文字</span><input type="color" id="col-btn-txt" onchange="updateCustomColor('--button-text', this.value)"></div>
+            <div class="color-picker-wrapper"><span>円の色</span><input type="color" id="col-circle" onchange="updateCustomColor('--circle-color', this.value)"></div>
+            <div class="color-picker-wrapper"><span>バー背景</span><input type="color" id="col-prog-bg" onchange="updateCustomColor('--progress-bg', this.value)"></div>
+            <div class="color-picker-wrapper"><span>バー進捗</span><input type="color" id="col-prog-fill" onchange="updateCustomColor('--progress-fill', this.value)"></div>
+        </div>
+        <button class="back-btn" onclick="switchScreen('settings-screen')">戻る</button>
+    </div>
+
+    <script>
+        // ─── Web Audio API による高精度シンセ電子音生成 ───
+        let audioCtx = null;
+        let alarmIntervalID = null; 
+
+        function initAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // 3・2・1秒前の電子音（高音でクリアなピ音）
+        function playSynthesizedTick() {
+            initAudioContext();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.type = 'sine'; 
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
+            
+            gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.13);
+        }
+
+        // 【音色修正】0秒終了時のアラーム音
+        // 威圧感を無くすため、角の丸いきれいな単一の『正弦波（sine）』を採用
+        // 小さすぎず、心地よく響く「550Hz」の一本音にして、重ねずに独立して鳴るように調整
+        function playSynthesizedAlarmPulse(duration = 0.7) {
+            initAudioContext();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.type = 'sine'; // 威圧感・トゲのないシンプルな波形
+            osc.frequency.setValueAtTime(550, audioCtx.currentTime); // 550Hz（耳に優しく、かつハッキリ届く定番の高さ）
+            
+            // 音が大きさを維持しつつ、終わり際だけを0.08秒かけてなめらかにフェードアウト
+            gainNode.gain.setValueAtTime(0.25, audioCtx.currentTime);
+            gainNode.gain.setValueAtTime(0.25, audioCtx.currentTime + duration - 0.08);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        let totalSeconds = 0;
+        let currentSeconds = 0;
+        let timerRequestID = null;
+        let timerMode = 'countup'; 
+        let isPaused = false;
+        let startTime = 0;
+        let pausedTimeElapsed = 0; 
+        let lastTickPlayed = -1; 
+        
+        let isAudioOn = true;
+        let isAlarmRepeat = true; 
+        let showCircle = true;
+        let showBar = true;
+
+        function switchScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function setTimerMode(mode) {
+            timerMode = mode;
+            document.getElementById('toggle-up').classList.toggle('active', mode === 'countup');
+            document.getElementById('toggle-down').classList.toggle('active', mode === 'countdown');
+        }
+
+        function setRepeatMode(repeatFlag) {
+            isAlarmRepeat = repeatFlag;
+            document.getElementById('repeat-on').classList.toggle('active', repeatFlag === true);
+            document.getElementById('repeat-off').classList.toggle('active', repeatFlag === false);
+        }
+
+        function getInputsInSeconds() {
+            const h = parseInt(document.getElementById('input-h').value) || 0;
+            const m = parseInt(document.getElementById('input-m').value) || 0;
+            const s = parseInt(document.getElementById('input-s').value) || 0;
+            return (h * 3600) + (m * 60) + s;
+        }
+
+        function setInputsFromSeconds(totalSecs) {
+            if (totalSecs < 0) totalSecs = 0;
+            const h = Math.floor(totalSecs / 3600);
+            const m = Math.floor((totalSecs % 3600) / 60);
+            const s = totalSecs % 60;
+            document.getElementById('input-h').value = h;
+            document.getElementById('input-m').value = m;
+            document.getElementById('input-s').value = s;
+        }
+
+        function resetSettings() {
+            setInputsFromSeconds(0);
+            setTimerMode('countup');
+            setRepeatMode(true);
+        }
+
+        function toggleAudio() {
+            isAudioOn = !isAudioOn;
+            document.getElementById('audio-toggle').classList.toggle('muted', !isAudioOn);
+        }
+
+        function toggleVisibility(target) {
+            if (target === 'circle') {
+                showCircle = !showCircle;
+                document.getElementById('toggle-circle-btn').textContent = `円グラフ: ${showCircle ? '表示' : '非表示'}`;
+            } else if (target === 'bar') {
+                showBar = !showBar;
+                document.getElementById('toggle-bar-btn').textContent = `帯: ${showBar ? '表示' : '非表示'}`;
+            }
+        }
+
+        function adjustLayoutElements() {
+            const svg = document.getElementById('timer-svg-container');
+            const bar = document.getElementById('progress-bar-container');
+            const txt = document.getElementById('timer-text');
+
+            svg.style.display = showCircle ? 'block' : 'none';
+            bar.style.display = showBar ? 'block' : 'none';
+
+            svg.classList.toggle('expanded', !showBar);
+            txt.classList.toggle('max-expanded', !showCircle && !showBar);
+        }
+
+        let longPressInterval = null;
+        let longPressTimeout = null;
+
+        function setupLongPress(element, action) {
+            const startPress = (e) => {
+                e.preventDefault();
+                initAudioContext(); 
+                action();
+                longPressTimeout = setTimeout(() => {
+                    longPressInterval = setInterval(action, 100);
+                }, 500);
+            };
+            const endPress = () => {
+                clearTimeout(longPressTimeout);
+                clearInterval(longPressInterval);
+            };
+            element.addEventListener('mousedown', startPress);
+            element.addEventListener('mouseup', endPress);
+            element.addEventListener('mouseleave', endPress);
+            element.addEventListener('touchstart', startPress, { passive: false });
+            element.addEventListener('touchend', endPress);
+        }
+
+        document.querySelectorAll('.quick-add-btn').forEach(btn => {
+            const secs = parseInt(btn.dataset.secs);
+            setupLongPress(btn, () => {
+                setInputsFromSeconds(getInputsInSeconds() + secs);
+            });
+        });
+
+        document.querySelectorAll('.arrow-btn').forEach(btn => {
+            const type = btn.dataset.type;
+            const dir = parseInt(btn.dataset.dir);
+            setupLongPress(btn, () => {
+                const input = document.getElementById(`input-${type}`);
+                let val = (parseInt(input.value) || 0) + dir;
+                if (type === 'h' && (val < 0 || val > 99)) val = val < 0 ? 99 : 0;
+                if ((type === 'm' || type === 's') && (val < 0 || val > 59)) val = val < 0 ? 59 : 0;
+                input.value = val;
+            });
+        });
+
+        // ─── タイマー動作ロジック ───
+        function startTimer() {
+            totalSeconds = getInputsInSeconds();
+            if (totalSeconds <= 0) return; 
+
+            initAudioContext();
+            stopAlarmInterval();
+
+            isPaused = false;
+            pausedTimeElapsed = 0;
+            lastTickPlayed = -1;
+            
+            document.getElementById('timer-text').classList.remove('time-up');
+            document.getElementById('pause-resume-btn').textContent = '一時停止';
+            
+            currentSeconds = (timerMode === 'countdown') ? totalSeconds : 0;
+
+            adjustLayoutElements();
+            switchScreen('timer-screen');
+            updateTimerDisplay();
+
+            startTime = performance.now();
+            runTimerLoop();
+        }
+
+        function runTimerLoop() {
+            if (isPaused) return;
+            timerRequestID = requestAnimationFrame(tick);
+        }
+
+        function stopAlarmInterval() {
+            if (alarmIntervalID) {
+                clearInterval(alarmIntervalID);
+                alarmIntervalID = null;
+            }
+        }
+
+        function tick(now) {
+            if (isPaused) return;
+
+            let elapsed = (now - startTime) / 1000 + pausedTimeElapsed;
+            let remaining = 0;
+
+            if (timerMode === 'countdown') {
+                remaining = totalSeconds - elapsed;
+                currentSeconds = Math.max(0, remaining);
+            } else {
+                currentSeconds = Math.min(totalSeconds, elapsed);
+                remaining = totalSeconds - currentSeconds;
+            }
+
+            updateTimerDisplay();
+
+            if (isAudioOn) {
+                let triggerThreshold = (timerMode === 'countdown') ? remaining : (totalSeconds - currentSeconds);
+                let ceilRemaining = Math.ceil(triggerThreshold);
+                
+                if (ceilRemaining <= 3 && ceilRemaining > 0 && lastTickPlayed !== ceilRemaining) {
+                    playSynthesizedTick(); 
+                    lastTickPlayed = ceilRemaining;
+                }
+            }
+
+            if ((timerMode === 'countdown' && currentSeconds <= 0) || (timerMode === 'countup' && currentSeconds >= totalSeconds)) {
+                document.getElementById('timer-text').classList.add('time-up');
+                
+                if (isAudioOn) {
+                    if (isAlarmRepeat) {
+                        // 連打：1.4秒周期（音が完全に消えて余韻を挟んだ後）に単音でポーン、ポーンと優しく鳴り続ける
+                        playSynthesizedAlarmPulse(0.7);
+                        alarmIntervalID = setInterval(() => {
+                            playSynthesizedAlarmPulse(0.7);
+                        }, 1400);
+                    } else {
+                        // 1回：一度だけシンプルな単音が1.2秒間すっきりと鳴って終了
+                        playSynthesizedAlarmPulse(1.2);
+                    }
+                }
+                
+                isPaused = true;
+                cancelAnimationFrame(timerRequestID);
+                return;
+            }
+
+            timerRequestID = requestAnimationFrame(tick);
+        }
+
+        function updateTimerDisplay() {
+            let displaySecs = (timerMode === 'countdown') ? Math.ceil(currentSeconds) : Math.floor(currentSeconds);
+            displaySecs = Math.max(0, Math.min(totalSeconds, displaySecs));
+
+            const h = Math.floor(displaySecs / 3600);
+            const m = Math.floor((displaySecs % 3600) / 60);
+            const s = displaySecs % 60;
+            const pad = (num) => String(num).padStart(2, '0');
+            
+            const isPortrait = window.innerHeight > window.innerWidth;
+            if (isPortrait && h === 0) {
+                document.getElementById('timer-text').textContent = `${pad(m)}:${pad(s)}`;
+            } else {
+                document.getElementById('timer-text').textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
+            }
+
+            let progressRatio = currentSeconds / totalSeconds;
+            progressRatio = Math.max(0, Math.min(1, progressRatio));
+
+            let barRatio = progressRatio;
+            document.getElementById('progress-bar').style.width = `${barRatio * 100}%`;
+
+            const circumference = 2 * Math.PI * 50; 
+            const circleFill = document.getElementById('progress-circle');
+            
+            if (timerMode === 'countup') {
+                let offset = circumference - (progressRatio * circumference);
+                circleFill.style.strokeDashoffset = offset;
+            } else {
+                let offset = circumference - (progressRatio * circumference);
+                circleFill.style.strokeDashoffset = offset;
+            }
+        }
+
+        function togglePauseResume() {
+            if (document.getElementById('timer-text').classList.contains('time-up')) return;
+            const btn = document.getElementById('pause-resume-btn');
+            if (!isPaused) {
+                isPaused = true;
+                cancelAnimationFrame(timerRequestID);
+                btn.textContent = '再開';
+                pausedTimeElapsed += (performance.now() - startTime) / 1000;
+            } else {
+                isPaused = false;
+                btn.textContent = '一時停止';
+                startTime = performance.now();
+                runTimerLoop();
+            }
+        }
+
+        function stopTimer() {
+            isPaused = false;
+            stopAlarmInterval();
+            cancelAnimationFrame(timerRequestID);
+            switchScreen('settings-screen');
+        }
+
+        const colorPresets = {
+            light: { bg: '#cbd5e1', text: '#0f172a', btnBg: '#3182ce', btnTxt: '#ffffff', circle: '#ffffff', progBg: '#ffffff', progFill: '#3182ce' },
+            dark: { bg: '#0f172a', text: '#f8fafc', btnBg: '#3b82f6', btnTxt: '#ffffff', circle: '#1e293b', progBg: '#1e293b', progFill: '#3b82f6' },
+            sakura: { bg: '#fed7d7', text: '#5c2525', btnBg: '#e53e3e', btnTxt: '#ffffff', circle: '#fff5f5', progBg: '#fff5f5', progFill: '#e53e3e' },
+            forest: { bg: '#c6f6d5', text: '#1c422f', btnBg: '#38a169', btnTxt: '#ffffff', circle: '#f0fff4', progBg: '#f0fff4', progFill: '#38a169' },
+            midnight: { bg: '#020617', text: '#94a3b8', btnBg: '#1e1b4b', btnTxt: '#f1f5f9', circle: '#0f172a', progBg: '#0f172a', progFill: '#4f46e5' },
+            sepia: { bg: '#feebc8', text: '#54300a', btnBg: '#dd6b20', btnTxt: '#ffffff', circle: '#fefcbf', progBg: '#fefcbf', progFill: '#dd6b20' }
+        };
+
+        function applyPreset(name) {
+            const p = colorPresets[name];
+            updateCustomColor('--bg-color', p.bg);
+            updateCustomColor('--text-color', p.text);
+            updateCustomColor('--button-bg', p.btnBg);
+            updateCustomColor('--button-text', p.btnTxt);
+            updateCustomColor('--circle-color', p.circle);
+            updateCustomColor('--progress-bg', p.progBg);
+            updateCustomColor('--progress-fill', p.progFill);
+
+            document.getElementById('col-bg').value = p.bg;
+            document.getElementById('col-text').value = p.text;
+            document.getElementById('col-btn-bg').value = p.btnBg;
+            document.getElementById('col-btn-txt').value = p.btnTxt;
+            document.getElementById('col-circle').value = p.circle;
+            document.getElementById('col-prog-bg').value = p.progBg;
+            document.getElementById('col-prog-fill').value = p.progFill;
+        }
+
+        function updateCustomColor(variable, val) {
+            document.documentElement.style.setProperty(variable, val);
+        }
+
+        window.addEventListener('resize', () => {
+            if (document.getElementById('timer-screen').classList.contains('active')) {
+                updateTimerDisplay();
+            }
+        });
+
+        applyPreset('light');
+    </script>
+</body>
+</html>
