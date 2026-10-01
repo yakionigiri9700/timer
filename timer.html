@@ -13,6 +13,10 @@
       user-select: none;
     }
 
+    .disable {
+      display: none;
+    }
+
     .button {
       text-align: center;
       font-size: xx-large;
@@ -110,7 +114,7 @@
 
     #timer_svg circle {
       fill: none;
-      stroke-width: 10px;
+      stroke-width: 100px;
     }
 
     .circle_background {
@@ -120,55 +124,87 @@
     #timer_circle_progress {
       stroke: #3182CE;
       /* 円の周の長さ */
-      stroke-dasharray: calc((90 * 2) * 3.14);
+      stroke-dasharray: calc((50 * 2) * 3.14);
       /* 点線を始める位置、どのぐらい消えさせるか */
       stroke-dashoffset: 0;
-      stroke-linecap: round;
       transition: stroke-dashoffset 1s linear;
+    }
+
+    .timer_screen_control button {
+      color: white;
+      background: #3182CE;
+      font-size: xx-large;
+      font-weight: bold;
+      border-radius: 15px;
+    }
+
+    .timer_screen_text {
+      color: #0F172A;
+      text-align: center;
+      font-size: xx-large;
+      font-weight: bold;
     }
   </style>
 </head>
 
 <body>
-  <div class="count_button">
-    <p><span id="background_count">カウント</span></p>
-    <button id="count_up_button" type="button" onclick="set_timer_count('up')">アップ</button>
-    <button id="count_down_button" type="button" onclick="set_timer_count('down')">ダウン</button>
+  <div id="settings_screen" class="enable">
+    <div class="count_button">
+      <p><span id="background_count">カウント</span></p>
+      <button id="count_up_button" type="button" onclick="set_timer_count('up')">アップ</button>
+      <button id="count_down_button" type="button" onclick="set_timer_count('down')">ダウン</button>
+    </div>
+    <div class="timer_control">
+      <button type="button" onclick="a_up_timer('hour')">▲</button>
+      <button type="button" onclick="a_up_timer('minute')">▲</button>
+      <button type="button" onclick="a_up_timer('second')">▲</button>
+    </div>
+    <div class="timer_text">
+      <input id="hour" type="number" value="0" max="24" min="0" autocomplete="off" />
+      :
+      <input id="minute" type="number" value="0" max="59" min="0" autocomplete="off" />
+      :
+      <input id="second" type="number" value="0" max="59" min="0" autocomplete="off" />
+    </div>
+    <div class="timer_control">
+      <button type="button" onclick="a_down_timer('hour')">▼</button>
+      <button type="button" onclick="a_down_timer('minute')">▼</button>
+      <button type="button" onclick="a_down_timer('second')">▼</button>
+    </div>
+    <div class="button">
+      <button type="button" onclick="timer_start_button()">スタート</button>
+      <button type="button" onclick="reset()">リセット</button>
+    </div>
+
   </div>
-  <div class="timer_control">
-    <button type="button" onclick="a_up_timer('hour')">▲</button>
-    <button type="button" onclick="a_up_timer('minute')">▲</button>
-    <button type="button" onclick="a_up_timer('second')">▲</button>
-  </div>
-  <div class="timer_text">
-    <input id="hour" type="number" value="0" max="24" min="0" autocomplete="off" />
-    :
-    <input id="minute" type="number" value="0" max="59" min="0" autocomplete="off" />
-    :
-    <input id="second" type="number" value="0" max="59" min="0" autocomplete="off" />
-  </div>
-  <div class="timer_control">
-    <button type="button" onclick="a_down_timer('hour')">▼</button>
-    <button type="button" onclick="a_down_timer('minute')">▼</button>
-    <button type="button" onclick="a_down_timer('second')">▼</button>
-  </div>
-  <div class="button">
-    <button type="button" onclick="timer_start()">スタート</button>
-    <button type="button" onclick="reset()">リセット</button>
-  </div>
-  <div class="progress_background">
-    <div class="progress_bar"></div>
-  </div>
-  <div class="timer_circle">
-    <svg id="timer_svg" viewBox="0 0 200 200">
-      <circle class="circle_background" cx="100" cy="100" r="90"></circle>
-      <circle id="timer_circle_progress" class="circle_progress" cx="100" cy="100" r="90"></circle>
-    </svg>
+
+  <div id="timer_screen" class="disable">
+    <div class="progress_background">
+      <div class="progress_bar"></div>
+    </div>
+    <div class="timer_circle">
+      <svg id="timer_svg" viewBox="0 0 200 200">
+        <circle class="circle_background" cx="100" cy="100" r="50"></circle>
+        <circle id="timer_circle_progress" class="circle_progress" cx="100" cy="100" r="50"></circle>
+      </svg>
+    </div>
+    <div class="timer_screen_text">
+      <div>
+        <span id="timer_screen_hour"></span><span id="timer_screen_minute">00</span>:<span
+          id="timer_screen_second">00</span>
+      </div>
+    </div>
+    <div class="timer_screen_control">
+      <button type="button" onclick="pause()">一時停止</button>
+      <button type="button" onclick="stop()">停止</button>
+    </div>
   </div>
 
   <script>
     let timer_count = "down";
     let timer_interval = null;
+    let total_seconds = 0;
+    let now_seconds = 0;
 
     function set_timer_count(text) {
       if (text === 'up' || text === 'down') {
@@ -183,7 +219,7 @@
     }
 
     // 画面の入力欄（Input）の数値を最新の変数と同期する関数
-    function update_display(total) {
+    function update_settings_display(total) {
       document.getElementById("hour").value = hour;
       document.getElementById("minute").value = minute;
       document.getElementById("second").value = second;
@@ -194,8 +230,19 @@
       document.querySelector(".progress_bar").style.width = (now_seconds / total_seconds) * 100 + "%";
     }
 
+    function update_timer_display() {
+      if (hour == "0") {
+        document.getElementById("timer_screen_hour").textContent = "";
+      } else {
+        document.getElementById("timer_screen_hour").textContent = hour.toString().padStart(2, '0') + ":";
+      }
+      document.getElementById("timer_screen_minute").textContent = minute.toString().padStart(2, '0');
+      document.getElementById("timer_screen_second").textContent = second.toString().padStart(2, '0');
+      document.querySelector(".progress_bar").style.width = (now_seconds / total_seconds) * 100 + "%";
+    }
+
     // 入力欄から現在の数値を読み込む関数
-    function load_inputs(total) {
+    function load_settings_inputs(total) {
       hour = parseInt(document.getElementById("hour").value) || 0;
       minute = parseInt(document.getElementById("minute").value) || 0;
       second = parseInt(document.getElementById("second").value) || 0;
@@ -210,23 +257,23 @@
     let second = 0;
 
     function a_up_timer(up_time) {
-      load_inputs("total"); // 現在の入力を取得
+      load_settings_inputs("total"); // 現在の入力を取得
       switch (up_time) {
         case 'hour': hour++; break;
         case 'minute': minute++; break;
         case 'second': second++; break;
       }
-      update_display("total"); // 画面を更新
+      update_settings_display("total"); // 画面を更新
     }
 
     function a_down_timer(down_time) {
-      load_inputs("total"); // 現在の入力を取得
+      load_settings_inputs("total"); // 現在の入力を取得
       switch (down_time) {
         case 'hour': if (hour > 0) hour--; break;
         case 'minute': if (minute > 0) minute--; break;
         case 'second': if (second > 0) second--; break;
       }
-      update_display("total"); // 画面を更新
+      update_settings_display("total"); // 画面を更新
     }
 
     const getLength = radius => (radius * 2) * 3.14;//関数 "円の周の長さを計算する"
@@ -235,7 +282,7 @@
     // タイマー開始
     function timer_start() {
       if (timer_interval !== null || total_seconds == 0) return; // 既に動いていたら二重起動防止
-      load_inputs("total");
+      load_settings_inputs("total");
       up_count_reset = "true"; // アップカウントのリセットフラグを立てる
 
       //アップカウントのときのラグ対策
@@ -244,15 +291,15 @@
         minute = 0;
         hour = 0;
         up_count_reset = "false";
-        update_display();
+        update_timer_display();
         document.querySelector(".progress_bar").style.width = "0%";
-        document.querySelector("#timer_circle_progress").style.strokeDashoffset = getLength(90);
+        document.querySelector("#timer_circle_progress").style.strokeDashoffset = getLength(50);
       }
 
       // [円] offsetの初期値を設定する
       let offset = 0;
       if (timer_count === "up") {
-        offset = getLength(90);
+        offset = getLength(50);
       }
 
 
@@ -270,10 +317,10 @@
 
           if (second > 0) {
             second--;
-            offset = offset + getStep(getLength(90), total_seconds);
+            offset = offset + getStep(getLength(50), total_seconds);
           } else {
             second = 59;
-            offset = offset + getStep(getLength(90), total_seconds);
+            offset = offset + getStep(getLength(50), total_seconds);
             if (minute > 0) {
               minute--;
             } else if (hour > 0) {
@@ -284,7 +331,7 @@
         } else {
           // アップカウント処理
           second++;
-          offset = offset - getStep(getLength(90), total_seconds);
+          offset = offset - getStep(getLength(50), total_seconds);
           if (second >= 60) {
             second = 0;
             minute++;
@@ -304,47 +351,30 @@
             return;
           }
         }
-        update_display();
+        update_timer_display();
         document.querySelector('#timer_circle_progress').style.strokeDashoffset = offset;
       }, 1000);
     }
 
-    // 円グラフ
-    const count_down_circle = time => {
-      let offset = 0
-
-      const timer = setInterval(() => {
-        offset = offset + getStep(getLength(90), time)//1秒あたりの移動距離を計算して、offsetに足していく
-
-        document.querySelector('#timer_circle_progress').style.strokeDashoffset = offset//offsetをスタイルに反映させる
-
-        if (offset === getLength(90)) clearInterval(timer)
-      }, 1000)//1秒ごとに実行する
-
-      const getLength = radius => (radius * 2) * 3.14//関数 "円の周の長さを計算する"
-      const getStep = (length, time) => length / time//関数 "1秒あたりの移動距離を計算する"
-    }
-
-    const count_up_circle = time => {
-      let offset = getLength(90)
-
-      const timer = setInterval(() => {
-        offset = offset - getStep(getLength(90), time)
-        document.querySelector('#timer_circle_progress').style.strokeDashoffset = offset
-
-        if (offset === 0) clearInterval(timer)
-      }, 1000)
+    function timer_start_button() {
+      document.querySelector("#settings_screen").classList.replace("enable", "disable");
+      document.querySelector("#timer_screen").classList.replace("disable", "enable");
+      timer_start();
     }
 
     // リセット
     function reset() {
-      clearInterval(timer_interval);
-      timer_interval = null;
       hour = 0;
       minute = 0;
       second = 0;
-      update_display();
-      document.querySelector('#timer_circle_progress').style.strokeDashoffset = getLength(90)
+      update_settings_display();
+    }
+
+    function stop() {
+      document.querySelector("#settings_screen").classList.replace("disable", "enable");
+      document.querySelector("#timer_screen").classList.replace("enable", "disable");
+      clearInterval(timer_interval);
+      timer_interval = null;
     }
   </script>
 </body>
