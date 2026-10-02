@@ -11,6 +11,10 @@
       color: white;
       font-family: "Yu Gothic Ul";
       user-select: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
     }
 
     .disable {
@@ -101,8 +105,9 @@
 
     .timer_circle {
       position: relative;
-      width: 200px;
-      height: 200px;
+      width: 90vmin;
+      height: 90vmin;
+      margin: 0 auto;
     }
 
     #timer_svg {
@@ -110,6 +115,7 @@
       height: 100%;
       vertical-align: middle;
       transform: rotate(-90deg);
+      margin: 0 auto;
     }
 
     #timer_svg circle {
@@ -141,8 +147,12 @@
     .timer_screen_text {
       color: #0F172A;
       text-align: center;
-      font-size: xx-large;
+      font-size: 240px;
       font-weight: bold;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
     }
   </style>
 </head>
@@ -284,6 +294,7 @@
       if (timer_interval !== null || total_seconds == 0) return; // 既に動いていたら二重起動防止
       load_settings_inputs("total");
       up_count_reset = "true"; // アップカウントのリセットフラグを立てる
+      document.querySelector(".timer_screen_text").style.color = "#0F172A";
 
       //アップカウントのときのラグ対策
       if (timer_count === "up" && now_seconds > 0) {
@@ -302,16 +313,15 @@
         offset = getLength(50);
       }
 
-
       timer_interval = setInterval(function () {
         if (timer_count === "down") {
           // ダウンカウント処理
           if (hour === 0 && minute === 0 && second === 0) {
             clearInterval(timer_interval);
             timer_interval = null;
+            document.querySelector(".timer_screen_text").style.color = "red";
             audio = new Audio('alarm.mp3');
             audio.play();
-            alert("タイムアップ！");
             return;
           }
 
@@ -328,6 +338,7 @@
               minute = 59;
             }
           }
+          now_seconds = (hour * 60 + minute) * 60 + second;
         } else {
           // アップカウント処理
           second++;
@@ -345,9 +356,9 @@
           if (now_seconds > total_seconds) {
             clearInterval(timer_interval);
             timer_interval = null;
+            document.querySelector(".timer_screen_text").style.color = "red";
             audio = new Audio('alarm.mp3');
             audio.play();
-            alert("タイムアップ！");
             return;
           }
         }
